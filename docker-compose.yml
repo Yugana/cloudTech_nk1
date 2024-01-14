@@ -1,0 +1,70 @@
+version: '3.1'
+
+volumes:
+  init-db:
+  data-db:
+  mongodb:
+  mongoconfig:
+
+services:
+  mongodb:
+    image: mongo:4.2.3-bionic
+    container_name: mongodb
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_DATABASE=test
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+    volumes:
+      # seeding scripts
+      - ./mongo-entrypoint:/docker-entrypoint-initdb.d
+      # named volumes
+      - mongodb:/data/db
+      - mongoconfig:/data/configdb
+
+
+  web:
+    image: app
+    restart: always
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/django_mongodb_docker
+    ports:
+      - 8000:8000
+    links:
+      - mongodb
+    depends_on:
+      - migration
+
+  migration:
+    build: .
+    image: app
+    command: python manage.py migrate
+    environment:
+     - MONGO_INITDB_ROOT_USERNAME=test
+     - MONGO_INITDB_ROOT_PASSWORD=admin
+     - MONGO_INITDB_DATABASE=admin
+    volumes:
+      - .:/django_mongodb_docker
+    links:
+      - mongodb
+    depends_on:
+      - make_migrations
+
+  make_migrations:
+    build: .
+    image: app
+    command: python manage.py makemigrations
+    environment:
+     - MONGO_INITDB_ROOT_USERNAME=test
+     - MONGO_INITDB_ROOT_PASSWORD=admin
+     - MONGO_INITDB_DATABASE=admin
+    volumes:
+      - .:/django_mongodb_docker
+    links:
+      - mongodb
+    depends_on:
+      - mongodb
+
+     
